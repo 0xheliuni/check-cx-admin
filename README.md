@@ -1,11 +1,6 @@
 # Check CX Admin
 
-`check-cx-admin` 是 `check-cx` 的后台管理项目，用于维护监控系统运行所依赖的核心配置与管理数据，包括：
-
-## 相关项目
-
-- 前台监控面板：[`BingZi-233/check-cx`](https://github.com/BingZi-233/check-cx)
-- 前台项目负责轮询检测、状态展示与只读 API；当前项目负责模型、Provider、模板、分组及系统通知等后台管理能力。
+`check-cx-admin` 是 [`check-cx`](https://github.com/BingZi-233/check-cx) 的后台管理项目——面板上每一个模型卡片，背后都是这里的一条配置。维护模型、Provider、请求模板、分组、允许登录的用户与系统通知：
 
 - `check_models`：模型配置
 - `check_configs`：Provider 配置
@@ -16,18 +11,31 @@
 - `check_history`：检测历史（只读）
 - `check_poller_leases`：轮询主节点状态（只读）
 
-主要技术栈如下：
+## 相关项目
 
-- Next.js 16 App Router
-- React 19
-- shadcn/ui
-- Supabase Auth + Supabase Database
+- 前台监控面板：[`BingZi-233/check-cx`](https://github.com/BingZi-233/check-cx)：负责轮询检测、状态展示与只读 API；本项目负责后台管理。
+
+## 推荐部署：check-cx 一键栈
+
+本项目已并入 `check-cx` 的一键部署栈（完整 self-hosted Supabase + 面板 + 本后台）。用一键栈时**不需要单独部署本项目**，只需在 `check-cx` 仓库的 `.env` 中开启 GitHub OAuth：
+
+```env
+GITHUB_ENABLED=true
+GITHUB_CLIENT_ID=...
+GITHUB_SECRET=...
+ADMIN_EMAILS=your@email.com
+APP_URL=http://localhost:3001
+```
+
+详见 [check-cx README](https://github.com/BingZi-233/check-cx#快速开始)。单独部署（对接云 Supabase 或已有实例）继续往下看。
+
+主要技术栈：Next.js 16 App Router、React 19、shadcn/ui、Supabase Auth + Supabase Database。
 
 ## 本地开发
 
 ```bash
 pnpm install
-cp .env.example .env.local
+cp .env.example .env.dev   # 注意：pnpm dev 读取的是 .env.dev
 pnpm dev
 ```
 
@@ -62,7 +70,7 @@ pnpm dev
 - 后台所有数据库读写都走 `SUPABASE_DB_SCHEMA` 指定的 schema；未设置时默认使用 `public`。
 - 项目认证配置在服务端运行时读取，便于在 Docker 等部署环境中通过环境变量覆盖。
 - 生产环境建议显式设置 `APP_URL`；否则 OAuth 回调地址会依赖请求头，在反向代理配置不当时可能错误地指向 `http://localhost:3000`。
-- 同时需要在 Supabase Auth 的 Redirect URLs 中加入 `APP_URL/auth/callback`，例如 `https://admin.example.com/auth/callback`。
+- 同时需要在 Supabase Auth 的 Redirect URLs 中加入 `APP_URL/auth/callback`，例如 `https://admin.example.com/auth/callback`。云 Supabase 在 Auth 设置页配置；self-hosted 一键栈对应 `.env` 中的 `SITE_URL` / `ADDITIONAL_REDIRECT_URLS`。
 
 ## Docker
 
@@ -81,6 +89,8 @@ docker compose up -d
 ```
 
 镜像在运行时直接读取 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_OR_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`、`APP_URL`、`SUPABASE_OAUTH_PROVIDERS`、`ADMIN_EMAILS`，不会将这些值固化到前端构建产物中。
+
+镜像 tag 说明：CI 只在 `v*` tag 上发布 `docker.io/bingzi233/check-cx-admin:<version>`（不带 `v` 前缀）和 `:latest`。
 
 ## 生产部署示例
 
@@ -133,12 +143,12 @@ SUPABASE_DB_SCHEMA=dev
 
 ### 4. 写入生产 compose
 
-创建 `docker-compose.yml` 文件：
+创建 `docker-compose.yml` 文件（`image` 使用明确版本 tag，例如 `0.3.3`）：
 
 ```yaml
 services:
   check-cx-admin:
-    image: bingzi233/check-cx-admin:v0.1.1
+    image: bingzi233/check-cx-admin:0.3.3
     container_name: check-cx-admin
     restart: unless-stopped
     ports:
@@ -191,13 +201,13 @@ Docker 发布工作流需要配置以下 Secrets：
 ### 推送版本 tag
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.3
+git push origin v0.3.3
 ```
 
-推送后，`docker.yml` 会自动构建并发布以下镜像：
+推送后，`docker.yml` 会自动构建并发布以下镜像（版本 tag 不带 `v` 前缀）：
 
-- `docker.io/bingzi233/check-cx-admin:v0.1.1`
+- `docker.io/bingzi233/check-cx-admin:0.3.3`
 - `docker.io/bingzi233/check-cx-admin:latest`
 
 ### 手动触发
